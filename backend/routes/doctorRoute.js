@@ -1,5 +1,5 @@
 import express from 'express';
-import { loginDoctor, appointmentsDoctor, appointmentCancel, doctorList, changeAvailablity, appointmentComplete, doctorDashboard, doctorProfile, updateDoctorProfile, patientHealthMetrics, sendDoctorChat, listDoctorChat, addDoctorHealthMetric, deleteDoctorHealthMetric, doctorChatInbox } from '../controllers/doctorController.js';
+import { loginDoctor, appointmentsDoctor, appointmentCancel, doctorList, changeAvailablity, appointmentComplete, doctorDashboard, doctorProfile, updateDoctorProfile, patientHealthMetrics, sendDoctorChat, listDoctorChat, addDoctorHealthMetric, deleteDoctorHealthMetric, doctorChatInbox, blockDoctorSlots, getDoctorSlots, initiateCallDoctor, saveIceDoctor, getCallSignalDoctor, endCallDoctor } from '../controllers/doctorController.js';
 import authDoctor from '../middleware/authDoctor.js';
 const doctorRouter = express.Router();
 
@@ -18,5 +18,13 @@ doctorRouter.delete("/health-metrics/:id", authDoctor, deleteDoctorHealthMetric)
 doctorRouter.post("/chat", authDoctor, sendDoctorChat)
 doctorRouter.get("/chat/inbox", authDoctor, doctorChatInbox)
 doctorRouter.get("/chat", authDoctor, listDoctorChat)
+doctorRouter.post("/block-slots", authDoctor, blockDoctorSlots)
+doctorRouter.post("/get-slots", authDoctor, getDoctorSlots)
+
+// Video calling signaling
+doctorRouter.post("/initiate-call", authDoctor, initiateCallDoctor)
+doctorRouter.post("/save-ice", authDoctor, saveIceDoctor)
+doctorRouter.get("/get-call-signal", authDoctor, getCallSignalDoctor)
+doctorRouter.post("/end-call", authDoctor, endCallDoctor)
 
 export default doctorRouter;

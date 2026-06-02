@@ -289,6 +289,11 @@ const Chat = () => {
                             <span className="text-[11px] text-gray-500">
                               {formatBubbleTime(m.createdAt)}
                             </span>
+                            {mine && (
+                              <span className="text-[11px] text-emerald-500 font-bold ml-1" title="Delivered & Read">
+                                ✓✓
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>

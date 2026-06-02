@@ -9,7 +9,7 @@ import { toast } from 'react-toastify'
 const Appointment = () => {
 
     const { docId } = useParams()
-    const { doctors, currencySymbol, backendUrl, token, getDoctosData } = useContext(AppContext)
+    const { doctors, currencySymbol, backendUrl, token, getDoctosData, userData } = useContext(AppContext)
     const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
     const [docInfo, setDocInfo] = useState(false)
@@ -17,7 +17,49 @@ const Appointment = () => {
     const [slotIndex, setSlotIndex] = useState(0)
     const [slotTime, setSlotTime] = useState('')
 
+    // Promo Code States
+    const [couponCode, setCouponCode] = useState('')
+    const [appliedDiscount, setAppliedDiscount] = useState(null)
+
+    // Dependent Patient Selection State
+    const [patientSelection, setPatientSelection] = useState('self')
+
+    // Referral Credits state
+    const [useReferralCredits, setUseReferralCredits] = useState(false)
+
     const navigate = useNavigate()
+
+    const handleApplyCoupon = async () => {
+        if (!token) {
+            toast.warning('Login to apply promo codes')
+            return navigate('/login')
+        }
+        if (!couponCode) return;
+        try {
+            const { data } = await axios.post(backendUrl + '/api/user/apply-coupon', { code: couponCode }, { headers: { token } });
+            if (data.success) {
+                toast.success(data.message);
+                let discount = (docInfo.fees * data.discountPercent) / 100;
+                if (data.maxDiscount > 0 && discount > data.maxDiscount) {
+                    discount = data.maxDiscount;
+                }
+                const finalAmount = docInfo.fees - discount;
+                setAppliedDiscount({
+                    code: couponCode.toUpperCase(),
+                    discountPercent: data.discountPercent,
+                    maxDiscount: data.maxDiscount,
+                    discountValue: discount,
+                    finalAmount
+                });
+            } else {
+                toast.error(data.message);
+                setAppliedDiscount(null);
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to apply promo code");
+        }
+    }
 
     const fetchDocInfo = async () => {
         const docInfo = doctors.find((doc) => doc._id === docId)
@@ -102,7 +144,15 @@ const Appointment = () => {
 
         try {
 
-            const { data } = await axios.post(backendUrl + '/api/user/book-appointment', { docId, slotDate, slotTime }, { headers: { token } })
+            const { data } = await axios.post(backendUrl + '/api/user/book-appointment', { 
+                docId, 
+                slotDate, 
+                slotTime,
+                couponCode: appliedDiscount ? appliedDiscount.code : '' ,
+                patientId: patientSelection === 'self' ? '' : patientSelection,
+                useReferralCredits
+            }, { headers: { token } })
+
             if (data.success) {
                 toast.success(data.message)
                 getDoctosData()
@@ -186,7 +236,100 @@ const Appointment = () => {
                     ))}
                 </div>
 
-                <button onClick={bookAppointment} className='bg-primary text-white text-sm font-light px-20 py-3 rounded-full my-6'>Book an appointment</button>
+                {/* Dependent Patient Selection Area */}
+                {userData && userData.familyMembers && userData.familyMembers.length > 0 && (
+                    <div className='mt-6 max-w-[340px]'>
+                        <p className='text-[#565656] font-semibold text-xs mb-1.5'>Patient / Book For</p>
+                        <select 
+                            value={patientSelection} 
+                            onChange={(e) => setPatientSelection(e.target.value)}
+                            className='w-full border border-gray-300 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-primary bg-white font-medium text-gray-700'
+                        >
+                            <option value="self">Myself ({userData.name})</option>
+                            {userData.familyMembers.map((member) => (
+                                <option key={member.id} value={member.id}>
+                                    {member.name} ({member.relation})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                {/* Promo Code Coupon Area */}
+                <div className='mt-6 max-w-[340px]'>
+                    <p className='text-[#565656] font-semibold text-xs mb-1.5'>Apply Promo Code</p>
+                    <div className='flex gap-2'>
+                        <input 
+                            type="text" 
+                            placeholder="e.g. WELCOME10 or HEALTH25" 
+                            value={couponCode}
+                            onChange={(e) => setCouponCode(e.target.value)}
+                            disabled={appliedDiscount !== null}
+                            className='border border-gray-300 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-primary flex-1 uppercase'
+                        />
+                        {appliedDiscount ? (
+                            <button 
+                                onClick={() => { setAppliedDiscount(null); setCouponCode(''); }} 
+                                className='bg-red-50 text-red-500 border border-red-200 px-4 py-2 rounded-lg text-xs hover:bg-red-100 transition-all font-bold'
+                            >
+                                Remove
+                            </button>
+                        ) : (
+                            <button 
+                                onClick={handleApplyCoupon} 
+                                className='bg-primary text-white px-5 py-2 rounded-lg text-xs hover:bg-primary/95 transition-all font-bold'
+                            >
+                                Apply
+                            </button>
+                        )}
+                    </div>
+                    {appliedDiscount && (
+                        <div className='mt-2.5 bg-green-50 border border-green-200 text-green-700 p-3 rounded-lg text-xs transition-all font-semibold flex flex-col gap-1 shadow-sm'>
+                            <p>✓ Code <strong>{appliedDiscount.code}</strong> Applied!</p>
+                            <p>Discount: {appliedDiscount.discountPercent}% Off (Saved ₹{appliedDiscount.discountValue})</p>
+                            <p>Final Price: <span className='text-sm text-green-800 font-bold'>₹{appliedDiscount.finalAmount}</span> (originally ₹{docInfo.fees})</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Referral Credits Checkout Card */}
+                {userData && userData.referralCredits > 0 && (
+                    <div className='mt-6 max-w-[340px] bg-purple-50/20 border border-purple-100/50 p-4 rounded-xl shadow-sm text-xs'>
+                        <div className='flex items-center justify-between'>
+                            <div className='flex items-center gap-1.5'>
+                                <span className='text-base'>✦</span>
+                                <div className='flex flex-col text-[#565656]'>
+                                    <span className='font-bold text-gray-800'>Apply Referral Credits</span>
+                                    <span className='text-[10px] text-gray-500'>Available Balance: ₹{userData.referralCredits}</span>
+                                </div>
+                            </div>
+                            <input 
+                                type="checkbox"
+                                checked={useReferralCredits}
+                                onChange={(e) => setUseReferralCredits(e.target.checked)}
+                                className='w-4 h-4 accent-purple-600 cursor-pointer rounded'
+                            />
+                        </div>
+                        {useReferralCredits && (
+                            <div className='mt-2.5 pt-2.5 border-t border-dashed border-purple-200/50 text-[10px] text-purple-750 font-bold flex flex-col gap-1'>
+                                <div className='flex justify-between text-gray-500'>
+                                    <span>Subtotal:</span>
+                                    <span>₹{appliedDiscount ? appliedDiscount.finalAmount : docInfo.fees}</span>
+                                </div>
+                                <div className='flex justify-between text-green-600 font-extrabold'>
+                                    <span>Credits Applied:</span>
+                                    <span>-₹{Math.min(userData.referralCredits, appliedDiscount ? appliedDiscount.finalAmount : docInfo.fees)}</span>
+                                </div>
+                                <div className='flex justify-between border-t border-purple-200/50 pt-1.5 text-xs text-gray-900 font-extrabold'>
+                                    <span>Total Payable:</span>
+                                    <span>₹{Math.max(0, (appliedDiscount ? appliedDiscount.finalAmount : docInfo.fees) - userData.referralCredits)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                <button onClick={bookAppointment} className='bg-primary text-white text-sm font-light px-20 py-3 rounded-full my-6 hover:scale-105 transition-all duration-300 shadow-md'>Book an appointment</button>
             </div>
 
             {/* Reviews Section */}

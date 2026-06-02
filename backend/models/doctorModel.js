@@ -16,6 +16,8 @@ const doctorSchema = new mongoose.Schema({
     date: { type: Number, required: true },
     reviews: { type: Array, default: [] },
     averageRating: { type: Number, default: 0 },
+    isVerified: { type: Boolean, default: true },
+    responseTime: { type: String, default: "15 mins" }
 }, { minimize: false })
 
 const doctorModel = mongoose.models.doctor || mongoose.model("doctor", doctorSchema);

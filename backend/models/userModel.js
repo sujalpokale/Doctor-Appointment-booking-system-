@@ -10,6 +10,14 @@ const userSchema = new mongoose.Schema({
     dob: { type: String, default: 'Not Selected' },
     password: { type: String, required: true },
     medicalDocuments: { type: Array, default: [] },
+    googleId: { type: String, unique: true, sparse: true },
+    familyMembers: { type: Array, default: [] },
+    twoFactorEnabled: { type: Boolean, default: false },
+    twoFactorOTP: { type: String, default: "" },
+    twoFactorOTPExpires: { type: Date },
+    referralCode: { type: String, unique: true, sparse: true },
+    referralCredits: { type: Number, default: 0 },
+    referredBy: { type: String, default: "" }
 })
 
 const userModel = mongoose.models.user || mongoose.model("user", userSchema);

@@ -11,12 +11,14 @@ import Dashboard from './pages/Admin/Dashboard';
 import AllAppointments from './pages/Admin/AllAppointments';
 import AddDoctor from './pages/Admin/AddDoctor';
 import DoctorsList from './pages/Admin/DoctorsList';
+import Campaigns from './pages/Admin/Campaigns';
 import Login from './pages/Login';
 import DoctorAppointments from './pages/Doctor/DoctorAppointments';
 import DoctorDashboard from './pages/Doctor/DoctorDashboard';
 import DoctorProfile from './pages/Doctor/DoctorProfile';
 import DoctorChat from './pages/Doctor/DoctorChat';
 import DoctorHealthChart from './pages/Doctor/DoctorHealthChart';
+import DoctorVideoCall from './pages/Doctor/VideoCall';
 
 const App = () => {
 
@@ -35,11 +37,13 @@ const App = () => {
           <Route path='/all-appointments' element={<AllAppointments />} />
           <Route path='/add-doctor' element={<AddDoctor />} />
           <Route path='/doctor-list' element={<DoctorsList />} />
+          <Route path='/admin-broadcast' element={<Campaigns />} />
           <Route path='/doctor-dashboard' element={<DoctorDashboard />} />
           <Route path='/doctor-appointments' element={<DoctorAppointments />} />
           <Route path='/doctor-profile' element={<DoctorProfile />} />
           <Route path='/doctor-chat' element={<DoctorChat />} />
           <Route path='/doctor-health' element={<DoctorHealthChart />} />
+          <Route path='/doctor-video-call' element={<DoctorVideoCall />} />
         </Routes>
       </div>
     </div>

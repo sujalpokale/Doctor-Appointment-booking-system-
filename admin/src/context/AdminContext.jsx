@@ -51,6 +51,22 @@ const AdminContextProvider = (props) => {
         }
     }
 
+    // Function to toggle doctor verification using API
+    const toggleVerification = async (docId) => {
+        try {
+            const { data } = await axios.post(backendUrl + '/api/admin/toggle-verification', { docId }, { headers: { aToken } })
+            if (data.success) {
+                toast.success(data.message)
+                getAllDoctors()
+            } else {
+                toast.error(data.message)
+            }
+        } catch (error) {
+            console.log(error)
+            toast.error(error.message)
+        }
+    }
+
 
     // Getting all appointment data from Database using API
     const getAllAppointments = async () => {
@@ -116,6 +132,7 @@ const AdminContextProvider = (props) => {
         doctors,
         getAllDoctors,
         changeAvailability,
+        toggleVerification,
         appointments,
         getAllAppointments,
         getDashData,

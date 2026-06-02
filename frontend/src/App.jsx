@@ -15,11 +15,17 @@ import 'react-toastify/dist/ReactToastify.css';
 import Verify from './pages/Verify'
 import HealthChart from './pages/HealthChart'
 import Chat from './pages/Chat'
+import MedicalTimeline from './pages/MedicalTimeline'
+import VideoCall from './pages/VideoCall'
+import MedicationReminders from './pages/MedicationReminders'
+import SymptomChecker from './pages/SymptomChecker'
+import CallReceiver from './components/CallReceiver'
 
 const App = () => {
   return (
     <div className='mx-4 sm:mx-[10%]'>
       <ToastContainer />
+      <CallReceiver />
       <Navbar />
       <Routes>
         <Route path='/' element={<Home />} />
@@ -34,6 +40,10 @@ const App = () => {
         <Route path='/verify' element={<Verify />} />
         <Route path='/health-chart' element={<HealthChart />} />
         <Route path='/chat' element={<Chat />} />
+        <Route path='/medical-history' element={<MedicalTimeline />} />
+        <Route path='/video-call' element={<VideoCall />} />
+        <Route path='/medication-reminders' element={<MedicationReminders />} />
+        <Route path='/symptom-checker' element={<SymptomChecker />} />
       </Routes>
       <Footer />
     </div>

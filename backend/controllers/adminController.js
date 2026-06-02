@@ -5,6 +5,7 @@ import bcrypt from "bcrypt";
 import validator from "validator";
 import { v2 as cloudinary } from "cloudinary";
 import userModel from "../models/userModel.js";
+import sendEmail from "../utils/sendEmail.js";
 
 // API for admin login
 const loginAdmin = async (req, res) => {
@@ -149,11 +150,87 @@ const adminDashboard = async (req, res) => {
     }
 }
 
+// API to toggle doctor verification status
+const toggleVerification = async (req, res) => {
+    try {
+        const { docId } = req.body;
+        const doctor = await doctorModel.findById(docId);
+        if (!doctor) {
+            return res.json({ success: false, message: "Doctor not found" });
+        }
+        doctor.isVerified = !doctor.isVerified;
+        await doctor.save();
+        res.json({ success: true, message: `Doctor status changed to: ${doctor.isVerified ? 'Verified' : 'Unverified'}` });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
+const sendBroadcast = async (req, res) => {
+    try {
+        const { subject, body, target } = req.body;
+
+        if (!subject || !body) {
+            return res.json({ success: false, message: "Subject and Body are required." });
+        }
+
+        let recipients = [];
+        if (target === "doctors") {
+            recipients = await doctorModel.find({}, "email name");
+        } else {
+            // default is patients
+            recipients = await userModel.find({}, "email name");
+        }
+
+        if (recipients.length === 0) {
+            return res.json({ success: false, message: "No recipients found for this target." });
+        }
+
+        let successCount = 0;
+        for (const recipient of recipients) {
+            try {
+                const personalizedHtml = `
+                    <div style="font-family: Arial, sans-serif; padding: 25px; color: #334155; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+                        <div style="background: linear-gradient(135deg, #5f6caf, #38bdf8); color: #ffffff; padding: 25px; border-radius: 10px; text-align: center; margin-bottom: 25px;">
+                            <h1 style="margin: 0; font-size: 22px; font-weight: bold; letter-spacing: 0.5px;">Mediconsult Health Newsletter</h1>
+                            <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">Your Premium Healthcare Partner</p>
+                        </div>
+                        <p style="font-size: 16px;">Dear <strong>${recipient.name}</strong>,</p>
+                        <div style="background-color: #f8fafc; border-left: 4px solid #5f6caf; padding: 20px; border-radius: 6px; font-size: 15px; color: #1e293b; margin: 20px 0; white-space: pre-wrap;">
+                            ${body}
+                        </div>
+                        <p style="font-size: 14px; margin-top: 25px;">Stay healthy,<br/><strong>Mediconsult Admin Team</strong></p>
+                        <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 25px 0;" />
+                        <p style="font-size: 11px; color: #94a3b8; text-align: center;">
+                            This is a transactional broadcast from Mediconsult. To manage your communication preferences, please visit your account dashboard.<br/>
+                            &copy; 2026 Mediconsult Inc. All rights reserved.
+                        </p>
+                    </div>
+                `;
+
+                await sendEmail(recipient.email, subject, subject, personalizedHtml);
+                successCount++;
+            } catch (err) {
+                console.log(`Failed to send email to ${recipient.email}:`, err.message);
+            }
+        }
+
+        res.json({ success: true, message: `Broadcast successfully dispatched to ${successCount} recipients.` });
+
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+}
+
 export {
     loginAdmin,
     appointmentsAdmin,
     appointmentCancel,
     addDoctor,
     allDoctors,
-    adminDashboard
+    adminDashboard,
+    toggleVerification,
+    sendBroadcast
 }

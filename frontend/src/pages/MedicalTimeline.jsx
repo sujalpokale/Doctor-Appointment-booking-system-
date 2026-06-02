@@ -1,129 +1,12 @@
 import React, { useContext, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { AppContext } from '../context/AppContext'
 import axios from 'axios'
 import { toast } from 'react-toastify'
-import { assets } from '../assets/assets'
 
-const MyAppointments = () => {
-
-    const { backendUrl, token, doctors, getDoctosData } = useContext(AppContext)
-    const navigate = useNavigate()
-
-    const [appointments, setAppointments] = useState([])
-    const [payment, setPayment] = useState('')
-    const [reviewId, setReviewId] = useState(null)
-    const [rating, setRating] = useState(5)
-    const [reviewText, setReviewText] = useState('')
-
-    // Rescheduling states
-    const [rescheduleAppId, setRescheduleAppId] = useState(null)
-    const [rescheduleDocSlots, setRescheduleDocSlots] = useState([])
-    const [rescheduleSlotIndex, setRescheduleSlotIndex] = useState(0)
-    const [rescheduleSlotTime, setRescheduleSlotTime] = useState('')
-    const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-
-    const getRescheduleAvailableSlots = async (docId) => {
-        setRescheduleDocSlots([])
-        const docInfo = doctors.find((doc) => doc._id === docId)
-        if (!docInfo) return;
-
-        let today = new Date()
-        const slotsArray = []
-
-        for (let i = 0; i < 7; i++) {
-            let currentDate = new Date(today)
-            currentDate.setDate(today.getDate() + i)
-
-            let endTime = new Date()
-            endTime.setDate(today.getDate() + i)
-            endTime.setHours(21, 0, 0, 0)
-
-            if (today.getDate() === currentDate.getDate()) {
-                currentDate.setHours(currentDate.getHours() > 10 ? currentDate.getHours() + 1 : 10)
-                currentDate.setMinutes(currentDate.getMinutes() > 30 ? 30 : 0)
-            } else {
-                currentDate.setHours(10)
-                currentDate.setMinutes(0)
-            }
-
-            let timeSlots = []
-
-            while (currentDate < endTime) {
-                let formattedTime = currentDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                let day = currentDate.getDate()
-                let month = currentDate.getMonth() + 1
-                let year = currentDate.getFullYear()
-
-                const slotDate = day + "_" + month + "_" + year
-                const slotTime = formattedTime
-
-                const isSlotAvailable = docInfo.slots_booked[slotDate] && docInfo.slots_booked[slotDate].includes(slotTime) ? false : true
-
-                if (isSlotAvailable) {
-                    timeSlots.push({
-                        datetime: new Date(currentDate),
-                        time: formattedTime
-                    })
-                }
-                currentDate.setMinutes(currentDate.getMinutes() + 30)
-            }
-            slotsArray.push(timeSlots)
-        }
-        setRescheduleDocSlots(slotsArray)
-    }
-
-    const triggerReschedule = async () => {
-        if (!rescheduleSlotTime || rescheduleDocSlots.length === 0) {
-            toast.warning('Please select a valid slot date and time')
-            return
-        }
-
-        const date = rescheduleDocSlots[rescheduleSlotIndex][0].datetime
-        let day = date.getDate()
-        let month = date.getMonth() + 1
-        let year = date.getFullYear()
-        const slotDate = day + "_" + month + "_" + year
-
-        try {
-            const { data } = await axios.post(
-                backendUrl + '/api/user/reschedule-appointment',
-                { appointmentId: rescheduleAppId, newSlotDate: slotDate, newSlotTime: rescheduleSlotTime },
-                { headers: { token } }
-            )
-
-            if (data.success) {
-                toast.success(data.message)
-                setRescheduleAppId(null)
-                setRescheduleSlotTime('')
-                getDoctosData()
-                getUserAppointments()
-            } else {
-                toast.error(data.message)
-            }
-        } catch (error) {
-            console.log(error)
-            toast.error(error.message)
-        }
-    }
-
-    const submitReview = async (appointmentId, docId) => {
-        try {
-            const { data } = await axios.post(backendUrl + '/api/user/add-review', { appointmentId, docId, rating, text: reviewText }, { headers: { token } })
-            if (data.success) {
-                toast.success(data.message)
-                setReviewId(null)
-                setReviewText('')
-                setRating(5)
-                getUserAppointments()
-            } else {
-                toast.error(data.message)
-            }
-        } catch (error) {
-            console.log(error)
-            toast.error(error.message)
-        }
-    }
+const MedicalTimeline = () => {
+    const { backendUrl, token } = useContext(AppContext)
+    const [history, setHistory] = useState([])
+    const [loading, setLoading] = useState(true)
 
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -132,68 +15,24 @@ const MyAppointments = () => {
         return dateArray[0] + " " + months[Number(dateArray[1])] + " " + dateArray[2]
     }
 
-    const getUserAppointments = async () => {
+    const fetchMedicalHistory = async () => {
         try {
+            setLoading(true)
             const { data } = await axios.get(backendUrl + '/api/user/appointments', { headers: { token } })
-            setAppointments(data.appointments.reverse())
-        } catch (error) {
-            console.log(error)
-            toast.error(error.message)
-        }
-    }
-
-    const cancelAppointment = async (appointmentId) => {
-        try {
-            const { data } = await axios.post(backendUrl + '/api/user/cancel-appointment', { appointmentId }, { headers: { token } })
             if (data.success) {
-                toast.success(data.message)
-                getUserAppointments()
+                // Filter only completed appointments
+                const completed = data.appointments.filter(app => app.isCompleted)
+                // Sort chronologically (newest first)
+                completed.sort((a, b) => b.date - a.date)
+                setHistory(completed)
             } else {
                 toast.error(data.message)
             }
         } catch (error) {
             console.log(error)
             toast.error(error.message)
-        }
-    }
-
-    const initPay = (order) => {
-        const options = {
-            key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-            amount: order.amount,
-            currency: order.currency,
-            name: 'Appointment Payment',
-            description: "Appointment Payment",
-            order_id: order.id,
-            receipt: order.receipt,
-            handler: async (response) => {
-                try {
-                    const { data } = await axios.post(backendUrl + "/api/user/verifyRazorpay", response, { headers: { token } });
-                    if (data.success) {
-                        navigate('/my-appointments')
-                        getUserAppointments()
-                    }
-                } catch (error) {
-                    console.log(error)
-                    toast.error(error.message)
-                }
-            }
-        };
-        const rzp = new window.Razorpay(options);
-        rzp.open();
-    };
-
-    const appointmentRazorpay = async (appointmentId) => {
-        try {
-            const { data } = await axios.post(backendUrl + '/api/user/payment-razorpay', { appointmentId }, { headers: { token } })
-            if (data.success) {
-                initPay(data.order)
-            }else{
-                toast.error(data.message)
-            }
-        } catch (error) {
-            console.log(error)
-            toast.error(error.message)
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -620,165 +459,113 @@ const MyAppointments = () => {
 
     useEffect(() => {
         if (token) {
-            getUserAppointments()
+            fetchMedicalHistory()
         }
     }, [token])
 
     return (
-        <div>
-            <p className='pb-3 mt-12 text-lg font-medium text-gray-600 border-b'>My appointments</p>
-            <div className=''>
-                {appointments.map((item, index) => (
-                    <div key={index} className="flex flex-col border-b last:border-0 rounded-lg bg-white my-3 shadow-sm border border-gray-100">
-                        <div className='grid grid-cols-[1fr_2fr] gap-4 sm:flex sm:gap-6 p-4'>
-                            <div>
-                                <img className='w-36 bg-[#EAEFFF] rounded-md' src={item.docData.image} alt="" />
+        <div className="py-10 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
+            <div className="text-center mb-12">
+                <h1 className="text-3xl font-extrabold text-gray-900 sm:text-4xl tracking-tight">
+                    Your Medical History Timeline
+                </h1>
+                <p className="mt-3 max-w-2xl mx-auto text-base text-gray-500 sm:mt-4">
+                    A chronological roadmap of your historical consultations, doctor diagnoses, and clinical prescriptions.
+                </p>
+            </div>
+
+            {loading ? (
+                <div className="flex justify-center items-center h-48">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+                </div>
+            ) : history.length === 0 ? (
+                <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+                    <p className="text-gray-400 text-lg font-medium">No completed consultation history found.</p>
+                    <p className="text-gray-500 text-sm mt-1">Once you complete a scheduled doctor appointment, details will map here.</p>
+                </div>
+            ) : (
+                <div className="relative border-l-2 border-[#5f6caf]/30 ml-4 sm:ml-32">
+                    {history.map((app, index) => (
+                        <div key={app._id} className="mb-10 ml-6 relative">
+                            {/* Bullet icon on timeline */}
+                            <span className="absolute -left-9 top-1.5 bg-[#5f6caf] text-white flex items-center justify-center rounded-full w-6 h-6 ring-4 ring-white shadow-sm font-semibold text-xs">
+                                {history.length - index}
+                            </span>
+
+                            {/* Sticky Left Date for Large Viewports */}
+                            <div className="hidden sm:block absolute -left-36 top-1.5 text-right w-28">
+                                <p className="text-sm font-bold text-gray-800">{slotDateFormat(app.slotDate)}</p>
+                                <p className="text-xs text-gray-500">{app.slotTime}</p>
                             </div>
-                            <div className='flex-1 text-sm text-[#5E5E5E]'>
-                                <p className='text-[#262626] text-base font-semibold'>{item.docData.name}</p>
-                                <p>{item.docData.speciality}</p>
-                                <p className='text-[#464646] font-medium mt-3'>Address:</p>
-                                <p className=''>{item.docData.address.line1}</p>
-                                <p className=''>{item.docData.address.line2}</p>
-                                <p className=' mt-3'><span className='text-sm text-[#3C3C3C] font-medium'>Date & Time:</span> {slotDateFormat(item.slotDate)} |  {item.slotTime}</p>
-                                
-                                {item.isCompleted && (item.notes || item.aiSummary) && (
-                                  <div className='mt-4 p-4 rounded-xl border border-stone-150 bg-stone-50/50 flex flex-col gap-3 text-xs'>
-                                    {item.notes && (
-                                      <div>
-                                        <p className='font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1'>📋 Doctor's Remarks</p>
-                                        <p className='text-gray-700 mt-1 italic'>"{item.notes}"</p>
-                                      </div>
+
+                            {/* Timeline Card */}
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:border-[#5f6caf]/40 transition-all duration-300 p-6 flex flex-col md:flex-row gap-6">
+                                <div className="flex-1">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-gray-100">
+                                        <div className="flex items-center gap-3">
+                                            <img 
+                                                className="w-12 h-12 bg-[#EAEFFF] rounded-full object-cover border-2 border-[#5f6caf]/20" 
+                                                src={app.docData.image} 
+                                                alt={app.docData.name} 
+                                            />
+                                            <div>
+                                                <h3 className="text-lg font-bold text-gray-900">{app.docData.name}</h3>
+                                                <p className="text-xs text-primary font-medium">{app.docData.speciality}</p>
+                                            </div>
+                                        </div>
+                                        <div className="sm:text-right">
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                                                Consultation Complete
+                                            </span>
+                                            <p className="block sm:hidden text-xs font-semibold text-gray-500 mt-1">{slotDateFormat(app.slotDate)} | {app.slotTime}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-3">
+                                        <h4 className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-1.5">
+                                            <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                            Clinical Notes & Prescription Remarks
+                                        </h4>
+                                        <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600 italic border-l-4 border-primary/50 font-light white-space-pre-wrap">
+                                            {app.notes || "No clinical remarks recorded for this session."}
+                                        </div>
+                                    </div>
+
+                                    {app.aiSummary && (
+                                        <div className="mt-4">
+                                            <h4 className="text-sm font-semibold text-purple-650 mb-2 flex items-center gap-1.5">
+                                                <svg className="w-4 h-4 text-purple-650" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                                </svg>
+                                                AI Diagnostic Clinical Summary ✦
+                                            </h4>
+                                            <div className="bg-purple-50/20 rounded-lg p-4 text-sm text-gray-650 border border-purple-100/60 leading-relaxed font-medium">
+                                                {app.aiSummary}
+                                            </div>
+                                        </div>
                                     )}
-                                    {item.aiSummary && (
-                                      <div className={`${item.notes ? 'pt-2.5 border-t border-dashed border-stone-200' : ''}`}>
-                                        <p className='font-extrabold text-purple-650 flex items-center gap-0.5 uppercase tracking-wider'>
-                                          ✦ AI Clinical Diagnostic Summary
-                                        </p>
-                                        <p className='text-gray-650 mt-1.5 leading-relaxed bg-purple-50/30 p-3 rounded-lg border border-purple-100/50 font-medium'>
-                                          {item.aiSummary}
-                                        </p>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                            </div>
-                            <div></div>
-                            <div className='flex flex-col gap-2 justify-end text-sm text-center'>
-                                {!item.cancelled && !item.payment && !item.isCompleted && payment !== item._id && <button onClick={() => setPayment(item._id)} className='text-[#696969] sm:min-w-48 py-2 border rounded hover:bg-primary hover:text-white transition-all duration-300'>Pay Online</button>}
-                                {!item.cancelled && !item.payment && !item.isCompleted && payment === item._id && <button onClick={() => appointmentRazorpay(item._id)} className='text-[#696969] sm:min-w-48 py-2 border rounded hover:bg-gray-100 hover:text-white transition-all duration-300 flex items-center justify-center'><img className='max-w-20 max-h-5' src={assets.razorpay_logo} alt="" /></button>}
-                                {!item.cancelled && item.payment && !item.isCompleted && <button className='sm:min-w-48 py-2 border rounded text-[#696969]  bg-[#EAEFFF]'>Paid</button>}
 
-                                {!item.cancelled && !item.isCompleted && item.payment && (
-                                    <button 
-                                        onClick={() => navigate(`/video-call?appointmentId=${item._id}`)} 
-                                        className='sm:min-w-48 py-2 border border-primary rounded text-white bg-primary hover:bg-primary/95 font-semibold transition-all duration-300 flex items-center justify-center gap-1.5 shadow-sm animate-pulse'
-                                    >
-                                        Join Video Call 🎥
-                                    </button>
-                                )}
-
-                                {item.isCompleted && <button className='sm:min-w-48 py-2 border border-green-500 rounded text-green-500 bg-green-50 font-medium'>Completed ✅</button>}
-                                
-                                {item.isCompleted && <button onClick={() => handlePrintPrescription(item)} className='sm:min-w-48 py-2 border border-primary rounded text-primary hover:bg-[#5f6caf]/10 font-medium transition-all duration-300'>Download Prescription 📄</button>}
-
-                                {item.isCompleted && !item.isReviewed && reviewId !== item._id && <button onClick={() => {setReviewId(item._id); setRating(5); setReviewText('');}} className='sm:min-w-48 py-2 border border-amber-500 rounded text-amber-500 hover:bg-amber-50 font-medium transition-all duration-300'>Rate Doctor ⭐️</button>}
-                                {item.isCompleted && item.isReviewed && <button disabled className='sm:min-w-48 py-2 border border-gray-300 rounded text-gray-500 font-medium bg-gray-50'>Reviewed ⭐️</button>}
-
-                                {!item.cancelled && !item.isCompleted && (item.rescheduledCount || 0) < 2 && (
-                                     <button onClick={() => {
-                                         setRescheduleAppId(item._id);
-                                         setRescheduleSlotIndex(0);
-                                         setRescheduleSlotTime('');
-                                         getRescheduleAvailableSlots(item.docId);
-                                     }} className='text-[#696969] sm:min-w-48 py-2 border rounded hover:bg-primary hover:text-white transition-all duration-300'>
-                                         Reschedule Slot {item.rescheduledCount > 0 ? `(${item.rescheduledCount}/2)` : ''}
-                                     </button>
-                                )}
-
-                                {!item.cancelled && !item.isCompleted && <button onClick={() => cancelAppointment(item._id)} className='text-[#696969] sm:min-w-48 py-2 border rounded hover:bg-red-600 hover:text-white transition-all duration-300'>Cancel appointment</button>}
-                                {item.cancelled && !item.isCompleted && <button className='sm:min-w-48 py-2 border border-red-500 rounded text-red-500'>Appointment cancelled</button>}
+                                    <div className="mt-5 flex justify-end gap-3 border-t border-gray-50 pt-4">
+                                        <button 
+                                            onClick={() => handlePrintPrescription(app)}
+                                            className="inline-flex items-center gap-1.5 px-4 py-2 border border-primary text-primary text-xs font-semibold rounded-lg hover:bg-primary/5 transition-all"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                            Export Report
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        
-                        {rescheduleAppId === item._id && (
-                            <div className="bg-gray-50 p-5 border-t border-gray-200">
-                                <p className="font-semibold text-gray-800 mb-2">Select a New Slot for Rescheduling</p>
-                                <p className="text-xs text-gray-500 mb-4">Note: You can reschedule this appointment up to 2 times.</p>
-                                
-                                <div className='flex gap-3 items-center w-full overflow-x-scroll mb-4 py-1'>
-                                    {rescheduleDocSlots.length > 0 && rescheduleDocSlots.map((daySlots, idx) => (
-                                        <div 
-                                            onClick={() => { setRescheduleSlotIndex(idx); setRescheduleSlotTime(''); }} 
-                                            key={idx} 
-                                            className={`text-center py-3 px-4 min-w-16 rounded-lg cursor-pointer transition-all ${rescheduleSlotIndex === idx ? 'bg-primary text-white shadow-sm' : 'bg-white border border-[#DDDDDD] hover:bg-gray-100'}`}
-                                        >
-                                            <p className='text-xs font-semibold'>{daySlots[0] && daysOfWeek[daySlots[0].datetime.getDay()]}</p>
-                                            <p className='text-sm'>{daySlots[0] && daySlots[0].datetime.getDate()}</p>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className='flex items-center gap-3 w-full overflow-x-scroll mb-5 py-1'>
-                                    {rescheduleDocSlots.length > 0 && rescheduleDocSlots[rescheduleSlotIndex]?.length > 0 ? (
-                                        rescheduleDocSlots[rescheduleSlotIndex].map((slot, idx) => (
-                                            <p 
-                                                onClick={() => setRescheduleSlotTime(slot.time)} 
-                                                key={idx} 
-                                                className={`text-xs font-medium flex-shrink-0 px-4 py-2 rounded-full cursor-pointer transition-all ${slot.time === rescheduleSlotTime ? 'bg-primary text-white shadow-sm' : 'bg-white text-[#949494] border border-[#B4B4B4] hover:bg-gray-100'}`}
-                                            >
-                                                {slot.time.toLowerCase()}
-                                            </p>
-                                        ))
-                                    ) : (
-                                        <p className="text-sm text-gray-400 py-1">No slots available for this day.</p>
-                                    )}
-                                </div>
-
-                                <div className="flex gap-3">
-                                    <button 
-                                        onClick={triggerReschedule} 
-                                        disabled={!rescheduleSlotTime} 
-                                        className="bg-primary text-white px-6 py-2 rounded shadow-sm text-sm font-medium hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Confirm Reschedule
-                                    </button>
-                                    <button 
-                                        onClick={() => setRescheduleAppId(null)} 
-                                        className="bg-gray-200 text-gray-700 px-6 py-2 rounded shadow-sm text-sm font-medium hover:bg-gray-300 transition-all"
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {reviewId === item._id && (
-                            <div className="bg-gray-50 p-4 border-t border-gray-200">
-                                <p className="font-semibold text-gray-800 mb-2">Leave a Rating for {item.docData.name}</p>
-                                <div className="flex gap-1 mb-3">
-                                    {[1, 2, 3, 4, 5].map(star => (
-                                        <button key={star} onClick={() => setRating(star)} className={`text-2xl ${star <= rating ? 'text-amber-400' : 'text-gray-300'} transition-colors`}>★</button>
-                                    ))}
-                                </div>
-                                <textarea
-                                    className="w-full sm:w-1/2 p-3 border rounded-lg text-sm bg-white mb-3 outline-none focus:ring-1 focus:ring-primary"
-                                    rows="3"
-                                    placeholder="Write a brief review about your experience..."
-                                    value={reviewText}
-                                    onChange={(e) => setReviewText(e.target.value)}
-                                ></textarea>
-                                <div className="flex gap-3">
-                                    <button onClick={() => submitReview(item._id, item.docId)} disabled={!rating} className="bg-primary text-white px-6 py-2 rounded shadow-sm text-sm font-medium hover:bg-primary/90 transition-all">Submit Review</button>
-                                    <button onClick={() => setReviewId(null)} className="bg-gray-200 text-gray-700 px-6 py-2 rounded shadow-sm text-sm font-medium hover:bg-gray-300 transition-all">Cancel</button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
         </div>
     )
 }
 
-export default MyAppointments
+export default MedicalTimeline

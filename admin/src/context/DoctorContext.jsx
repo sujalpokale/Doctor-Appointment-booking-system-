@@ -70,11 +70,11 @@ const DoctorContextProvider = (props) => {
     }
 
     // Function to Mark appointment completed using API
-    const completeAppointment = async (appointmentId) => {
+    const completeAppointment = async (appointmentId, notes = "", prescription = []) => {
 
         try {
 
-            const { data } = await axios.post(backendUrl + '/api/doctor/complete-appointment', { appointmentId }, { headers: { dToken } })
+            const { data } = await axios.post(backendUrl + '/api/doctor/complete-appointment', { appointmentId, notes, prescription }, { headers: { dToken } })
 
             if (data.success) {
                 toast.success(data.message)

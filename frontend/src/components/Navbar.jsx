@@ -1,13 +1,38 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { assets } from "../assets/assets";
 import { NavLink, useNavigate } from "react-router-dom";
 import { AppContext } from "../context/AppContext";
+import axios from "axios";
 
 const Navbar = () => {
   const navigate = useNavigate();
 
   const [showMenu, setShowMenu] = useState(false);
-  const { token, setToken, userData } = useContext(AppContext);
+  const { token, setToken, userData, backendUrl } = useContext(AppContext);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const checkUnreadMessages = async () => {
+    if (!token) return;
+    try {
+      const { data } = await axios.get(backendUrl + "/api/user/chat/inbox", {
+        headers: { token },
+      });
+      if (data.success && data.conversations) {
+        const activeAlerts = data.conversations.filter(c => c.lastMessage && c.lastMessage.senderRole === "doctor").length;
+        setUnreadCount(activeAlerts);
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      checkUnreadMessages();
+      const interval = setInterval(checkUnreadMessages, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [token]);
 
   const logout = () => {
     localStorage.removeItem("token");
@@ -44,9 +69,24 @@ const Navbar = () => {
           <li className="py-1">HEALTH</li>
           <hr className="border-none outline-none h-0.5 bg-primary w-3/5 m-auto hidden" />
         </NavLink>
-        <NavLink to="/chat">
-          <li className="py-1">CHAT</li>
+        <NavLink to="/chat" className="relative">
+          <li className="py-1 flex items-center">
+            CHAT
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-2.5 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+            )}
+          </li>
           <hr className="border-none outline-none h-0.5 bg-primary w-3/5 m-auto hidden" />
+        </NavLink>
+        <NavLink to="/medication-reminders">
+          <li className="py-1">REMINDERS</li>
+          <hr className="border-none outline-none h-0.5 bg-primary w-3/5 m-auto hidden" />
+        </NavLink>
+        <NavLink to="/symptom-checker" className="text-purple-600 font-semibold relative">
+          <li className="py-1 flex items-center gap-0.5">
+            AI ASSISTANT <span className="text-[10px]">✦</span>
+          </li>
+          <hr className="border-none outline-none h-0.5 bg-purple-650 w-3/5 m-auto hidden" />
         </NavLink>
       </ul>
       <div className="flex items-center gap-4 ">
@@ -69,16 +109,37 @@ const Navbar = () => {
                   My Appointments
                 </p>
                 <p
+                  onClick={() => navigate("/medical-history")}
+                  className="hover:text-black cursor-pointer"
+                >
+                  Medical History
+                </p>
+                <p
                   onClick={() => navigate("/health-chart")}
                   className="hover:text-black cursor-pointer"
                 >
                   Health chart
                 </p>
                 <p
-                  onClick={() => navigate("/chat")}
+                  onClick={() => navigate("/medication-reminders")}
                   className="hover:text-black cursor-pointer"
                 >
-                  Messages
+                  Medication Reminders
+                </p>
+                <p
+                  onClick={() => navigate("/symptom-checker")}
+                  className="text-purple-600 hover:text-purple-700 cursor-pointer font-bold flex items-center gap-1"
+                >
+                  AI Symptom Checker <span className="text-[10px]">✦</span>
+                </p>
+                <p
+                  onClick={() => navigate("/chat")}
+                  className="hover:text-black cursor-pointer flex items-center justify-between"
+                >
+                  <span>Messages</span>
+                  {unreadCount > 0 && (
+                    <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></span>
+                  )}
                 </p>
                 <p onClick={logout} className="hover:text-black cursor-pointer">
                   Logout
@@ -127,11 +188,25 @@ const Navbar = () => {
             <NavLink onClick={() => setShowMenu(false)} to="/contact">
               <p className="px-4 py-2 rounded full inline-block">CONTACT</p>
             </NavLink>
+            <NavLink onClick={() => setShowMenu(false)} to="/medical-history">
+              <p className="px-4 py-2 rounded full inline-block">MEDICAL HISTORY</p>
+            </NavLink>
             <NavLink onClick={() => setShowMenu(false)} to="/health-chart">
               <p className="px-4 py-2 rounded full inline-block">HEALTH</p>
             </NavLink>
+            <NavLink onClick={() => setShowMenu(false)} to="/medication-reminders">
+              <p className="px-4 py-2 rounded full inline-block">REMINDERS</p>
+            </NavLink>
+            <NavLink onClick={() => setShowMenu(false)} to="/symptom-checker">
+              <p className="px-4 py-2 rounded full inline-block text-purple-600 font-bold">AI ASSISTANT ✦</p>
+            </NavLink>
             <NavLink onClick={() => setShowMenu(false)} to="/chat">
-              <p className="px-4 py-2 rounded full inline-block">CHAT</p>
+              <p className="px-4 py-2 rounded full inline-block flex items-center gap-1.5">
+                CHAT
+                {unreadCount > 0 && (
+                  <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse inline-block"></span>
+                )}
+              </p>
             </NavLink>
           </ul>
         </div>
